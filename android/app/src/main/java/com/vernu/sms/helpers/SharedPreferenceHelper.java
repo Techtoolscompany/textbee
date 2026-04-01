@@ -3,6 +3,10 @@ package com.vernu.sms.helpers;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
+
 public class SharedPreferenceHelper {
     private final static String PREF_FILE = "PREF";
 
@@ -43,6 +47,19 @@ public class SharedPreferenceHelper {
     public static boolean getSharedPreferenceBoolean(Context context, String key, boolean defValue) {
         SharedPreferences settings = context.getSharedPreferences(PREF_FILE, 0);
         return settings.getBoolean(key, defValue);
+    }
+
+    public static Set<String> getSharedPreferenceStringSet(Context context, String key) {
+        SharedPreferences settings = context.getSharedPreferences(PREF_FILE, 0);
+        Set<String> values = settings.getStringSet(key, Collections.emptySet());
+        return new HashSet<>(values);
+    }
+
+    public static void setSharedPreferenceStringSet(Context context, String key, Set<String> values) {
+        SharedPreferences settings = context.getSharedPreferences(PREF_FILE, 0);
+        SharedPreferences.Editor editor = settings.edit();
+        editor.putStringSet(key, new HashSet<>(values));
+        editor.apply();
     }
 
     public static void clearSharedPreference(Context context, String key) {

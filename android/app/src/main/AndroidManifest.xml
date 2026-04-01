@@ -43,6 +43,20 @@
                 <action android:name="android.provider.Telephony.SMS_RECEIVED"/>
             </intent-filter>
         </receiver>
+        <receiver
+            android:name=".receivers.SmsSentReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.vernu.sms.ACTION_SMS_SENT" />
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name=".receivers.SmsDeliveredReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.vernu.sms.ACTION_SMS_DELIVERED" />
+            </intent-filter>
+        </receiver>
 
         <receiver android:enabled="true"
             android:name=".receivers.BootCompletedReceiver"

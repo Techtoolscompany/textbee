@@ -1,11 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".activities.MainActivity">
-
 
     <ScrollView
         android:id="@+id/scrollView2"
@@ -20,33 +18,32 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Enter your API key or scan the QR code below to get started"
-                android:textSize="20dp"
-                android:layout_margin="5dp"
+                android:layout_gravity="center"
+                android:layout_margin="8dp"
+                android:text="Enter or scan your Fellowship 360 enrollment token to activate this gateway device"
                 android:textAlignment="center"
-                android:layout_gravity="center" />
-
+                android:textSize="20sp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="#ccccccee"
                 android:layout_margin="5dp"
+                android:background="#ccccccee"
                 android:orientation="horizontal">
 
                 <LinearLayout
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:orientation="vertical"
                     android:padding="5dp">
 
                     <EditText
-                        android:id="@+id/apiKeyEditText"
+                        android:id="@+id/enrollmentTokenEditText"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:ems="10"
-                        android:hint="API Key"
+                        android:hint="Enrollment Token"
                         android:inputType="text"
                         android:minHeight="48dp"
                         android:textIsSelectable="true" />
@@ -63,10 +60,10 @@
                         android:visibility="gone" />
 
                     <Button
-                        android:id="@+id/registerDeviceBtn"
+                        android:id="@+id/enrollDeviceBtn"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Register" />
+                        android:text="Enroll Device" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -87,12 +84,11 @@
                 </LinearLayout>
             </LinearLayout>
 
-
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="center"
                 android:layout_margin="5dp"
+                android:gravity="center"
                 android:orientation="horizontal">
 
                 <LinearLayout
@@ -110,19 +106,37 @@
                 </LinearLayout>
 
                 <LinearLayout
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="center"
                     android:layout_weight="1"
                     android:orientation="vertical">
 
                     <TextView
-
                         android:id="@+id/deviceBrandAndModelTxt"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Device Brand, Model"
                         android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Organization"
+                        android:textStyle="italic" />
+
+                    <TextView
+                        android:id="@+id/organizationNameTxt"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Not enrolled" />
+
+                    <TextView
+                        android:id="@+id/syncStatusTxt"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="Enroll this device to begin syncing"
+                        android:textSize="12sp" />
 
                     <LinearLayout
                         android:layout_width="wrap_content"
@@ -133,7 +147,6 @@
                         <LinearLayout
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_gravity="center"
                             android:orientation="vertical">
 
                             <TextView
@@ -146,19 +159,15 @@
                                 android:id="@+id/deviceIdTxt"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="ae5ce05c05cde3" />
+                                android:text="Not enrolled" />
                         </LinearLayout>
 
                         <ImageButton
-
                             android:id="@+id/copyDeviceIdImgBtn"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-
                             android:src="@drawable/ic_baseline_content_copy_24" />
                     </LinearLayout>
-
-
                 </LinearLayout>
 
                 <LinearLayout
@@ -179,8 +188,8 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Status"
-                        android:textSize="16dp"
+                        android:text="Gateway"
+                        android:textSize="16sp"
                         android:textStyle="bold" />
                 </LinearLayout>
             </LinearLayout>
@@ -190,7 +199,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="30dp"
                 android:orientation="vertical"
-                android:padding="10px">
+                android:padding="10dp">
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -211,13 +220,34 @@
                     android:text="Grant Permissions"
                     android:visibility="visible" />
 
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/syncNowBtn"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Sync Now" />
+
+                    <Button
+                        android:id="@+id/resetEnrollmentBtn"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:enabled="false"
+                        android:text="Reset Enrollment" />
+                </LinearLayout>
+
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="TextBee will only work if you grant SMS Permissions"
-                    android:textSize="14dp"
+                    android:text="Fellowship 360 Gateway requires SMS permissions to send and receive messages from this device"
+                    android:textSize="14sp"
                     android:textStyle="italic" />
-
 
                 <View
                     android:layout_width="match_parent"
@@ -235,16 +265,14 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Toggle this if you want to receive SMS"
-                    android:textSize="14dp"
+                    android:text="Turn this off if inbound SMS should not be forwarded to Fellowship 360"
+                    android:textSize="14sp"
                     android:textStyle="italic" />
-
 
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:background="#000000" />
-
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -261,30 +289,28 @@
                         android:id="@+id/defaultSimSlotRadioGroup"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical"></RadioGroup>
+                        android:orientation="vertical" />
                 </LinearLayout>
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Select your preferred SIM for sending SMS"
-                    android:textSize="14dp"
+                    android:text="Select the SIM this device should prefer for outbound SMS"
+                    android:textSize="14sp"
                     android:textStyle="italic" />
 
             </LinearLayout>
-
 
             <LinearLayout
                 android:id="@+id/bottom"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="30dp"
                 android:background="#ccccccee"
                 android:orientation="vertical"
-                android:layout_marginTop="30dp"
                 android:padding="12dp">
 
                 <TextView
-
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="How To Use"
@@ -293,11 +319,10 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Go to textbee.dev/dashboard and click `generate API Key / Get started`, then copy and paste the API key generated or scan the QR code" />
+                    android:text="Open Fellowship 360, create or copy the enrollment token for your gateway device, then paste it here or scan the QR code to enroll this phone." />
 
             </LinearLayout>
         </LinearLayout>
     </ScrollView>
-
 
 </LinearLayout>

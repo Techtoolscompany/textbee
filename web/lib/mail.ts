@@ -1,14 +1,17 @@
 import nodemailer from 'nodemailer'
+import type SMTPTransport from 'nodemailer/lib/smtp-transport'
 
-const transporter = nodemailer.createTransport({
+const transportConfig: SMTPTransport.Options = {
   host: process.env.MAIL_HOST,
-  port: process.env.MAIL_PORT,
+  port: Number(process.env.MAIL_PORT ?? 587),
   secure: false,
   auth: {
     user: process.env.MAIL_USER,
     pass: process.env.MAIL_PASS,
   },
-})
+}
+
+const transporter = nodemailer.createTransport(transportConfig)
 
 export const sendMail = async ({
   to,

@@ -1,23 +1,22 @@
 package com.vernu.sms.dtos;
 
-public class RegisterDeviceInputDTO {
+public class EnrollDeviceRequestDTO {
+    private String enrollmentToken;
     private String fcmToken;
-    private boolean enabled;
-    private String brand;
+    private String deviceName;
+    private String phoneNumber;
     private String manufacturer;
     private String model;
-    private String serial;
     private String buildId;
-    private String os;
-    private String osVersion;
     private String appVersionName;
     private int appVersionCode;
 
-    public RegisterDeviceInputDTO() {
+    public String getEnrollmentToken() {
+        return enrollmentToken;
     }
 
-    public RegisterDeviceInputDTO(String fcmToken) {
-        this.fcmToken = fcmToken;
+    public void setEnrollmentToken(String enrollmentToken) {
+        this.enrollmentToken = enrollmentToken;
     }
 
     public String getFcmToken() {
@@ -28,20 +27,20 @@ public class RegisterDeviceInputDTO {
         this.fcmToken = fcmToken;
     }
 
-    public boolean isEnabled() {
-        return enabled;
+    public String getDeviceName() {
+        return deviceName;
     }
 
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
+    public void setDeviceName(String deviceName) {
+        this.deviceName = deviceName;
     }
 
-    public String getBrand() {
-        return brand;
+    public String getPhoneNumber() {
+        return phoneNumber;
     }
 
-    public void setBrand(String brand) {
-        this.brand = brand;
+    public void setPhoneNumber(String phoneNumber) {
+        this.phoneNumber = phoneNumber;
     }
 
     public String getManufacturer() {
@@ -60,36 +59,12 @@ public class RegisterDeviceInputDTO {
         this.model = model;
     }
 
-    public String getSerial() {
-        return serial;
-    }
-
-    public void setSerial(String serial) {
-        this.serial = serial;
-    }
-
     public String getBuildId() {
         return buildId;
     }
 
     public void setBuildId(String buildId) {
         this.buildId = buildId;
-    }
-
-    public String getOs() {
-        return os;
-    }
-
-    public void setOs(String os) {
-        this.os = os;
-    }
-
-    public String getOsVersion() {
-        return osVersion;
-    }
-
-    public void setOsVersion(String osVersion) {
-        this.osVersion = osVersion;
     }
 
     public String getAppVersionName() {

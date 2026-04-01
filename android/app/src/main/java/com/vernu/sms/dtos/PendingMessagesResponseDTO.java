@@ -1,28 +1,19 @@
-package com.vernu.sms.models;
+package com.vernu.sms.dtos;
 
 import java.util.List;
 
-public class SMSPayload {
-    private String type;
-    private List<OutboundMessage> messages;
+public class PendingMessagesResponseDTO {
+    private List<PendingMessageDTO> messages;
 
-    public String getType() {
-        return type;
-    }
-
-    public void setType(String type) {
-        this.type = type;
-    }
-
-    public List<OutboundMessage> getMessages() {
+    public List<PendingMessageDTO> getMessages() {
         return messages;
     }
 
-    public void setMessages(List<OutboundMessage> messages) {
+    public void setMessages(List<PendingMessageDTO> messages) {
         this.messages = messages;
     }
 
-    public static class OutboundMessage {
+    public static class PendingMessageDTO {
         private String id;
         private String to;
         private String body;

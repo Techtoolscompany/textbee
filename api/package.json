@@ -1,7 +1,7 @@
 {
-  "name": "sms-gateway-backend",
+  "name": "fellowship360-gateway-api",
   "version": "0.0.1",
-  "description": "",
+  "description": "Fellowship 360 Gateway backend forked from TextBee.",
   "author": "",
   "private": true,
   "license": "UNLICENSED",

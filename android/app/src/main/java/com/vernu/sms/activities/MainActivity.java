@@ -3,6 +3,7 @@ package com.vernu.sms.activities;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -19,6 +20,7 @@ import android.widget.RadioGroup;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import com.google.android.material.snackbar.Snackbar;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.zxing.integration.android.IntentIntegrator;
@@ -26,13 +28,15 @@ import com.google.zxing.integration.android.IntentResult;
 import com.vernu.sms.ApiManager;
 import com.vernu.sms.AppConstants;
 import com.vernu.sms.BuildConfig;
-import com.vernu.sms.TextBeeUtils;
+import com.vernu.sms.GatewaySyncManager;
 import com.vernu.sms.R;
-import com.vernu.sms.dtos.RegisterDeviceInputDTO;
-import com.vernu.sms.dtos.RegisterDeviceResponseDTO;
+import com.vernu.sms.TextBeeUtils;
+import com.vernu.sms.dtos.EnrollDeviceRequestDTO;
+import com.vernu.sms.dtos.EnrollDeviceResponseDTO;
 import com.vernu.sms.helpers.SharedPreferenceHelper;
+
 import java.util.Arrays;
-import java.util.Objects;
+
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -40,167 +44,200 @@ import retrofit2.Response;
 public class MainActivity extends AppCompatActivity {
 
     private Context mContext;
-    private Switch gatewaySwitch, receiveSMSSwitch;
-    private EditText apiKeyEditText, fcmTokenEditText;
-    private Button registerDeviceBtn, grantSMSPermissionBtn, scanQRBtn;
+    private Switch gatewaySwitch;
+    private Switch receiveSMSSwitch;
+    private EditText enrollmentTokenEditText;
+    private EditText fcmTokenEditText;
+    private Button enrollDeviceBtn;
+    private Button grantSMSPermissionBtn;
+    private Button scanQRBtn;
+    private Button syncNowBtn;
+    private Button resetEnrollmentBtn;
     private ImageButton copyDeviceIdImgBtn;
-    private TextView deviceBrandAndModelTxt, deviceIdTxt;
+    private TextView deviceBrandAndModelTxt;
+    private TextView deviceIdTxt;
+    private TextView organizationNameTxt;
+    private TextView syncStatusTxt;
     private RadioGroup defaultSimSlotRadioGroup;
     private static final int SCAN_QR_REQUEST_CODE = 49374;
     private static final int PERMISSION_REQUEST_CODE = 0;
-    private String deviceId = null;
+    private static final int DEVICE_DEFAULT_SIM_ID = 123456;
+    private String deviceId = "";
+    private boolean isRefreshingUi = false;
     private static final String TAG = "MainActivity";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
 
         mContext = getApplicationContext();
         deviceId = SharedPreferenceHelper.getSharedPreferenceString(mContext, AppConstants.SHARED_PREFS_DEVICE_ID_KEY, "");
-        setContentView(R.layout.activity_main);
+
         gatewaySwitch = findViewById(R.id.gatewaySwitch);
         receiveSMSSwitch = findViewById(R.id.receiveSMSSwitch);
-        apiKeyEditText = findViewById(R.id.apiKeyEditText);
+        enrollmentTokenEditText = findViewById(R.id.enrollmentTokenEditText);
         fcmTokenEditText = findViewById(R.id.fcmTokenEditText);
-        registerDeviceBtn = findViewById(R.id.registerDeviceBtn);
+        enrollDeviceBtn = findViewById(R.id.enrollDeviceBtn);
         grantSMSPermissionBtn = findViewById(R.id.grantSMSPermissionBtn);
         scanQRBtn = findViewById(R.id.scanQRButton);
+        syncNowBtn = findViewById(R.id.syncNowBtn);
+        resetEnrollmentBtn = findViewById(R.id.resetEnrollmentBtn);
         deviceBrandAndModelTxt = findViewById(R.id.deviceBrandAndModelTxt);
         deviceIdTxt = findViewById(R.id.deviceIdTxt);
+        organizationNameTxt = findViewById(R.id.organizationNameTxt);
+        syncStatusTxt = findViewById(R.id.syncStatusTxt);
         copyDeviceIdImgBtn = findViewById(R.id.copyDeviceIdImgBtn);
         defaultSimSlotRadioGroup = findViewById(R.id.defaultSimSlotRadioGroup);
 
-        deviceIdTxt.setText(deviceId);
-        deviceBrandAndModelTxt.setText(Build.BRAND + " " + Build.MODEL);
+        deviceBrandAndModelTxt.setText(TextBeeUtils.buildDeviceName());
+        refreshUiFromPreferences();
+        bindPermissionState();
+        bindCopyDeviceId();
+        bindGatewayToggle();
+        bindReceiveSmsToggle();
+        bindEnrollmentActions();
+        bindSyncActions();
+        triggerBackgroundSync(false);
+    }
 
-        if (deviceId == null || deviceId.isEmpty()) {
-            registerDeviceBtn.setText("Register");
-        } else {
-            registerDeviceBtn.setText("Update");
-        }
+    @Override
+    protected void onResume() {
+        super.onResume();
+        refreshUiFromPreferences();
+        triggerBackgroundSync(false);
+    }
 
-        String[] missingPermissions = Arrays.stream(AppConstants.requiredPermissions).filter(permission -> !TextBeeUtils.isPermissionGranted(mContext, permission)).toArray(String[]::new);
+    private void bindPermissionState() {
+        String[] missingPermissions = Arrays.stream(AppConstants.requiredPermissions)
+                .filter(permission -> !TextBeeUtils.isPermissionGranted(mContext, permission))
+                .toArray(String[]::new);
         if (missingPermissions.length == 0) {
             grantSMSPermissionBtn.setEnabled(false);
-            grantSMSPermissionBtn.setText("Permission Granted");
+            grantSMSPermissionBtn.setText("Permissions Granted");
             renderAvailableSimOptions();
-        } else {
-            Snackbar.make(grantSMSPermissionBtn, "Please Grant Required Permissions to continue: " + Arrays.toString(missingPermissions), Snackbar.LENGTH_SHORT).show();
-            grantSMSPermissionBtn.setEnabled(true);
-            grantSMSPermissionBtn.setOnClickListener(this::handleRequestPermissions);
+            return;
         }
 
-//        TextBeeUtils.startStickyNotificationService(mContext);
+        Snackbar.make(grantSMSPermissionBtn, "Grant SMS permissions to use Fellowship 360 Gateway", Snackbar.LENGTH_SHORT).show();
+        grantSMSPermissionBtn.setEnabled(true);
+        grantSMSPermissionBtn.setOnClickListener(this::handleRequestPermissions);
+    }
 
+    private void bindCopyDeviceId() {
         copyDeviceIdImgBtn.setOnClickListener(view -> {
+            if (deviceId == null || deviceId.trim().isEmpty()) {
+                Snackbar.make(view, "Device ID not available yet", Snackbar.LENGTH_LONG).show();
+                return;
+            }
             ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
             ClipData clip = ClipData.newPlainText("Device ID", deviceId);
             clipboard.setPrimaryClip(clip);
-            Snackbar.make(view, "Copied", Snackbar.LENGTH_LONG).show();
+            Snackbar.make(view, "Device ID copied", Snackbar.LENGTH_LONG).show();
         });
+    }
 
-        apiKeyEditText.setText(SharedPreferenceHelper.getSharedPreferenceString(mContext, AppConstants.SHARED_PREFS_API_KEY_KEY, ""));
+    private void bindGatewayToggle() {
         gatewaySwitch.setChecked(SharedPreferenceHelper.getSharedPreferenceBoolean(mContext, AppConstants.SHARED_PREFS_GATEWAY_ENABLED_KEY, false));
-        gatewaySwitch.setOnCheckedChangeListener((compoundButton, isCheked) -> {
-            View view = compoundButton.getRootView();
-            compoundButton.setEnabled(false);
-            String key = apiKeyEditText.getText().toString();
-
-            RegisterDeviceInputDTO registerDeviceInput = new RegisterDeviceInputDTO();
-            registerDeviceInput.setEnabled(isCheked);
-            registerDeviceInput.setAppVersionCode(BuildConfig.VERSION_CODE);
-            registerDeviceInput.setAppVersionName(BuildConfig.VERSION_NAME);
-
-            Call<RegisterDeviceResponseDTO> apiCall = ApiManager.getApiService().updateDevice(deviceId, key, registerDeviceInput);
-            apiCall.enqueue(new Callback<RegisterDeviceResponseDTO>() {
-                @Override
-                public void onResponse(Call<RegisterDeviceResponseDTO> call, Response<RegisterDeviceResponseDTO> response) {
-                    Log.d(TAG, response.toString());
-                    if (!response.isSuccessful()) {
-                        Snackbar.make(view, response.message(), Snackbar.LENGTH_LONG).show();
-                        compoundButton.setEnabled(true);
-                        return;
-                    }
-                    Snackbar.make(view, "Gateway " + (isCheked ? "enabled" : "disabled"), Snackbar.LENGTH_LONG).show();
-                    SharedPreferenceHelper.setSharedPreferenceBoolean(mContext, AppConstants.SHARED_PREFS_GATEWAY_ENABLED_KEY, isCheked);
-                    boolean enabled = Boolean.TRUE.equals(Objects.requireNonNull(response.body()).data.get("enabled"));
-                    compoundButton.setChecked(enabled);
-//                    if (enabled) {
-//                        TextBeeUtils.startStickyNotificationService(mContext);
-//                    } else {
-//                        TextBeeUtils.stopStickyNotificationService(mContext);
-//                    }
-                    compoundButton.setEnabled(true);
-                }
-                @Override
-                public void onFailure(Call<RegisterDeviceResponseDTO> call, Throwable t) {
-                    Snackbar.make(view, "An error occurred :(", Snackbar.LENGTH_LONG).show();
-                    Log.e(TAG, "API_ERROR "+ t.getMessage());
-                    Log.e(TAG, "API_ERROR "+ t.getLocalizedMessage());
-                    compoundButton.setEnabled(true);
-                }
-            });
+        gatewaySwitch.setOnCheckedChangeListener((compoundButton, isChecked) -> {
+            if (isRefreshingUi) {
+                return;
+            }
+            SharedPreferenceHelper.setSharedPreferenceBoolean(mContext, AppConstants.SHARED_PREFS_GATEWAY_ENABLED_KEY, isChecked);
+            Snackbar.make(compoundButton, "Gateway " + (isChecked ? "enabled" : "disabled"), Snackbar.LENGTH_LONG).show();
+            triggerBackgroundSync(false);
         });
+    }
 
+    private void bindReceiveSmsToggle() {
         receiveSMSSwitch.setChecked(SharedPreferenceHelper.getSharedPreferenceBoolean(mContext, AppConstants.SHARED_PREFS_RECEIVE_SMS_ENABLED_KEY, false));
-        receiveSMSSwitch.setOnCheckedChangeListener((compoundButton, isCheked) -> {
-            View view = compoundButton.getRootView();
-            SharedPreferenceHelper.setSharedPreferenceBoolean(mContext, AppConstants.SHARED_PREFS_RECEIVE_SMS_ENABLED_KEY, isCheked);
-            compoundButton.setChecked(isCheked);
-            Snackbar.make(view, "Receive SMS " + (isCheked ? "enabled" : "disabled"), Snackbar.LENGTH_LONG).show();
+        receiveSMSSwitch.setOnCheckedChangeListener((compoundButton, isChecked) -> {
+            if (isRefreshingUi) {
+                return;
+            }
+            SharedPreferenceHelper.setSharedPreferenceBoolean(mContext, AppConstants.SHARED_PREFS_RECEIVE_SMS_ENABLED_KEY, isChecked);
+            Snackbar.make(compoundButton, "Receive SMS " + (isChecked ? "enabled" : "disabled"), Snackbar.LENGTH_LONG).show();
+            triggerBackgroundSync(false);
         });
+    }
 
-        // TODO: check gateway status/api key/device validity and update UI accordingly
-        registerDeviceBtn.setOnClickListener(view -> handleRegisterDevice());
+    private void bindEnrollmentActions() {
+        enrollDeviceBtn.setOnClickListener(view -> handleEnrollDevice());
         scanQRBtn.setOnClickListener(view -> {
             IntentIntegrator intentIntegrator = new IntentIntegrator(MainActivity.this);
-            intentIntegrator.setPrompt("Go to textbee.dev/dashboard and click Register Device to generate QR Code");
+            intentIntegrator.setPrompt("Scan the Fellowship 360 enrollment QR code from your organization settings");
             intentIntegrator.setRequestCode(SCAN_QR_REQUEST_CODE);
             intentIntegrator.initiateScan();
         });
     }
 
+    private void bindSyncActions() {
+        syncNowBtn.setOnClickListener(view -> triggerBackgroundSync(true));
+        resetEnrollmentBtn.setOnClickListener(view -> {
+            TextBeeUtils.clearEnrollmentState(mContext);
+            SharedPreferenceHelper.setSharedPreferenceBoolean(mContext, AppConstants.SHARED_PREFS_GATEWAY_ENABLED_KEY, false);
+            SharedPreferenceHelper.setSharedPreferenceBoolean(mContext, AppConstants.SHARED_PREFS_RECEIVE_SMS_ENABLED_KEY, false);
+            refreshUiFromPreferences();
+            Snackbar.make(view, "Enrollment reset on this device", Snackbar.LENGTH_LONG).show();
+        });
+    }
+
+    private void syncEnrollmentState() {
+        deviceId = SharedPreferenceHelper.getSharedPreferenceString(mContext, AppConstants.SHARED_PREFS_DEVICE_ID_KEY, "");
+        String organizationName = SharedPreferenceHelper.getSharedPreferenceString(mContext, AppConstants.SHARED_PREFS_ORGANIZATION_NAME_KEY, "Not enrolled");
+        deviceIdTxt.setText(deviceId == null || deviceId.isEmpty() ? "Not enrolled" : deviceId);
+        organizationNameTxt.setText(organizationName == null || organizationName.isEmpty() ? "Not enrolled" : organizationName);
+        enrollDeviceBtn.setText(deviceId == null || deviceId.isEmpty() ? "Enroll Device" : "Re-enroll Device");
+        resetEnrollmentBtn.setEnabled(deviceId != null && !deviceId.isEmpty());
+    }
+
     private void renderAvailableSimOptions() {
         try {
             defaultSimSlotRadioGroup.removeAllViews();
-            RadioButton defaultSimSlotRadioBtn = new RadioButton(mContext);
+            RadioButton defaultSimSlotRadioBtn = new RadioButton(this);
             defaultSimSlotRadioBtn.setText("Device Default");
-            defaultSimSlotRadioBtn.setId((int)123456);
+            defaultSimSlotRadioBtn.setId(DEVICE_DEFAULT_SIM_ID);
             defaultSimSlotRadioGroup.addView(defaultSimSlotRadioBtn);
+
             TextBeeUtils.getAvailableSimSlots(mContext).forEach(subscriptionInfo -> {
                 String simInfo = "SIM " + (subscriptionInfo.getSimSlotIndex() + 1) + " (" + subscriptionInfo.getDisplayName() + ")";
-                RadioButton radioButton = new RadioButton(mContext);
+                RadioButton radioButton = new RadioButton(this);
                 radioButton.setText(simInfo);
                 radioButton.setId(subscriptionInfo.getSubscriptionId());
                 defaultSimSlotRadioGroup.addView(radioButton);
             });
 
             int preferredSim = SharedPreferenceHelper.getSharedPreferenceInt(mContext, AppConstants.SHARED_PREFS_PREFERRED_SIM_KEY, -1);
-            if (preferredSim == -1) {
+            if (preferredSim == -1 || findViewById(preferredSim) == null) {
                 defaultSimSlotRadioGroup.check(defaultSimSlotRadioBtn.getId());
             } else {
                 defaultSimSlotRadioGroup.check(preferredSim);
             }
-            defaultSimSlotRadioGroup.setOnCheckedChangeListener((radioGroup, i) -> {
-                RadioButton radioButton = findViewById(i);
+
+            defaultSimSlotRadioGroup.setOnCheckedChangeListener((radioGroup, checkedId) -> {
+                if (isRefreshingUi) {
+                    return;
+                }
+                RadioButton radioButton = findViewById(checkedId);
                 if (radioButton == null) {
                     return;
                 }
                 radioButton.setChecked(true);
-                if("Device Default".equals(radioButton.getText().toString())) {
+                if (DEVICE_DEFAULT_SIM_ID == checkedId) {
                     SharedPreferenceHelper.clearSharedPreference(mContext, AppConstants.SHARED_PREFS_PREFERRED_SIM_KEY);
                 } else {
-                    SharedPreferenceHelper.setSharedPreferenceInt(mContext, AppConstants.SHARED_PREFS_PREFERRED_SIM_KEY, radioButton.getId());
+                    SharedPreferenceHelper.setSharedPreferenceInt(mContext, AppConstants.SHARED_PREFS_PREFERRED_SIM_KEY, checkedId);
                 }
+                triggerBackgroundSync(false);
             });
         } catch (Exception e) {
             Snackbar.make(defaultSimSlotRadioGroup.getRootView(), "Error: " + e.getMessage(), Snackbar.LENGTH_LONG).show();
-            Log.e(TAG, "SIM_SLOT_ERROR "+ e.getMessage());
+            Log.e(TAG, "SIM_SLOT_ERROR " + e.getMessage(), e);
         }
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
         if (requestCode != PERMISSION_REQUEST_CODE) {
@@ -208,100 +245,198 @@ public class MainActivity extends AppCompatActivity {
         }
         boolean allPermissionsGranted = Arrays.stream(permissions).allMatch(permission -> TextBeeUtils.isPermissionGranted(mContext, permission));
         if (allPermissionsGranted) {
-            Snackbar.make(findViewById(R.id.grantSMSPermissionBtn), "All Permissions Granted", Snackbar.LENGTH_SHORT).show();
+            Snackbar.make(findViewById(R.id.grantSMSPermissionBtn), "All permissions granted", Snackbar.LENGTH_SHORT).show();
             grantSMSPermissionBtn.setEnabled(false);
-            grantSMSPermissionBtn.setText("Permission Granted");
+            grantSMSPermissionBtn.setText("Permissions Granted");
             renderAvailableSimOptions();
         } else {
-            Snackbar.make(findViewById(R.id.grantSMSPermissionBtn), "Please Grant Required Permissions to continue", Snackbar.LENGTH_SHORT).show();
+            Snackbar.make(findViewById(R.id.grantSMSPermissionBtn), "Grant all required permissions to continue", Snackbar.LENGTH_SHORT).show();
         }
     }
 
-    private void handleRegisterDevice() {
+    private void handleEnrollDevice() {
+        String enrollmentToken = TextBeeUtils.normalizeEnrollmentToken(enrollmentTokenEditText.getText().toString());
+        if (enrollmentToken.isEmpty()) {
+            Snackbar.make(enrollDeviceBtn, "Enter or scan an enrollment token first", Snackbar.LENGTH_LONG).show();
+            return;
+        }
 
-        String newKey = apiKeyEditText.getText().toString();
-        registerDeviceBtn.setEnabled(false);
-        registerDeviceBtn.setText("Loading...");
-        View view = findViewById(R.id.registerDeviceBtn);
+        enrollDeviceBtn.setEnabled(false);
+        enrollDeviceBtn.setText("Enrolling...");
+        View view = findViewById(R.id.enrollDeviceBtn);
 
-        FirebaseMessaging.getInstance().getToken()
-                .addOnCompleteListener(task -> {
-                    if (!task.isSuccessful()) {
-                        Snackbar.make(view, "Failed to obtain FCM Token :(", Snackbar.LENGTH_LONG).show();
-                        registerDeviceBtn.setEnabled(true);
-                        registerDeviceBtn.setText("Update");
+        FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
+            if (!task.isSuccessful()) {
+                Snackbar.make(view, "Failed to obtain the FCM token", Snackbar.LENGTH_LONG).show();
+                resetEnrollButtonState();
+                return;
+            }
+
+            String token = task.getResult();
+            fcmTokenEditText.setText(token);
+
+            EnrollDeviceRequestDTO requestDTO = new EnrollDeviceRequestDTO();
+            requestDTO.setEnrollmentToken(enrollmentToken);
+            requestDTO.setFcmToken(token);
+            requestDTO.setDeviceName(TextBeeUtils.buildDeviceName());
+            String phoneNumber = TextBeeUtils.getPhoneNumber(mContext);
+            requestDTO.setPhoneNumber(phoneNumber.isEmpty() ? null : phoneNumber);
+            requestDTO.setManufacturer(Build.MANUFACTURER);
+            requestDTO.setModel(Build.MODEL);
+            requestDTO.setBuildId(Build.ID);
+            requestDTO.setAppVersionCode(BuildConfig.VERSION_CODE);
+            requestDTO.setAppVersionName(BuildConfig.VERSION_NAME);
+
+            ApiManager.getApiService().enrollDevice(requestDTO).enqueue(new Callback<EnrollDeviceResponseDTO>() {
+                @Override
+                public void onResponse(Call<EnrollDeviceResponseDTO> call, Response<EnrollDeviceResponseDTO> response) {
+                    Log.d(TAG, response.toString());
+                    if (!response.isSuccessful() || response.body() == null) {
+                        Snackbar.make(view, "Enrollment failed: " + response.message(), Snackbar.LENGTH_LONG).show();
+                        resetEnrollButtonState();
                         return;
                     }
-                    String token = task.getResult();
-                    fcmTokenEditText.setText(token);
 
-                    RegisterDeviceInputDTO registerDeviceInput = new RegisterDeviceInputDTO();
-                    registerDeviceInput.setEnabled(true);
-                    registerDeviceInput.setFcmToken(token);
-                    registerDeviceInput.setBrand(Build.BRAND);
-                    registerDeviceInput.setManufacturer(Build.MANUFACTURER);
-                    registerDeviceInput.setModel(Build.MODEL);
-                    registerDeviceInput.setBuildId(Build.ID);
-                    registerDeviceInput.setOs(Build.VERSION.BASE_OS);
-                    registerDeviceInput.setAppVersionCode(BuildConfig.VERSION_CODE);
-                    registerDeviceInput.setAppVersionName(BuildConfig.VERSION_NAME);
+                    applyEnrollmentResponse(response.body(), phoneNumber);
+                    triggerBackgroundSync(false);
+                    Snackbar.make(view, "Device enrolled with Fellowship 360 Gateway", Snackbar.LENGTH_LONG).show();
+                    resetEnrollButtonState();
+                }
 
-                    Call<RegisterDeviceResponseDTO> apiCall = ApiManager.getApiService().registerDevice(newKey, registerDeviceInput);
-                    apiCall.enqueue(new Callback<RegisterDeviceResponseDTO>() {
-                        @Override
-                        public void onResponse(Call<RegisterDeviceResponseDTO> call, Response<RegisterDeviceResponseDTO> response) {
-                            Log.d(TAG, response.toString());
-                            if (!response.isSuccessful()) {
-                                Snackbar.make(view, response.message(), Snackbar.LENGTH_LONG).show();
-                                registerDeviceBtn.setEnabled(true);
-                                registerDeviceBtn.setText("Update");
-                                return;
-                            }
-                            SharedPreferenceHelper.setSharedPreferenceString(mContext, AppConstants.SHARED_PREFS_API_KEY_KEY, newKey);
-                            Snackbar.make(view, "Device Registration Successful :)", Snackbar.LENGTH_LONG).show();
-                            deviceId = response.body().data.get("_id").toString();
-                            deviceIdTxt.setText(deviceId);
-                            SharedPreferenceHelper.setSharedPreferenceString(mContext, AppConstants.SHARED_PREFS_DEVICE_ID_KEY, deviceId);
-                            registerDeviceBtn.setEnabled(true);
-                            registerDeviceBtn.setText("Update");
+                @Override
+                public void onFailure(Call<EnrollDeviceResponseDTO> call, Throwable t) {
+                    Snackbar.make(view, "An error occurred during enrollment", Snackbar.LENGTH_LONG).show();
+                    Log.e(TAG, "API_ERROR " + t.getMessage(), t);
+                    resetEnrollButtonState();
+                }
+            });
+        });
+    }
 
-                        }
-                        @Override
-                        public void onFailure(Call<RegisterDeviceResponseDTO> call, Throwable t) {
-                            Snackbar.make(view, "An error occurred :(", Snackbar.LENGTH_LONG).show();
-                            Log.e(TAG, "API_ERROR "+ t.getMessage());
-                            Log.e(TAG, "API_ERROR "+ t.getLocalizedMessage());
-                            registerDeviceBtn.setEnabled(true);
-                            registerDeviceBtn.setText("Update");
-                        }
-                    });
-                });
+    private void applyEnrollmentResponse(EnrollDeviceResponseDTO response, String phoneNumber) {
+        GatewaySyncManager.applyEnrollmentState(mContext, response, phoneNumber);
+        refreshUiFromPreferences();
+    }
+
+    private void resetEnrollButtonState() {
+        enrollDeviceBtn.setEnabled(true);
+        enrollDeviceBtn.setText(deviceId == null || deviceId.isEmpty() ? "Enroll Device" : "Re-enroll Device");
+    }
+
+    private String safeValue(String value) {
+        return value == null ? "" : value;
     }
 
     private void handleRequestPermissions(View view) {
-        boolean allPermissionsGranted = Arrays.stream(AppConstants.requiredPermissions).allMatch(permission -> TextBeeUtils.isPermissionGranted(mContext, permission));
+        boolean allPermissionsGranted = Arrays.stream(AppConstants.requiredPermissions)
+                .allMatch(permission -> TextBeeUtils.isPermissionGranted(mContext, permission));
         if (allPermissionsGranted) {
-            Snackbar.make(view, "Already got permissions", Snackbar.LENGTH_SHORT).show();
+            Snackbar.make(view, "Permissions already granted", Snackbar.LENGTH_SHORT).show();
             return;
         }
-        String[] permissionsToRequest = Arrays.stream(AppConstants.requiredPermissions).filter(permission -> !TextBeeUtils.isPermissionGranted(mContext, permission)).toArray(String[]::new);
-        Snackbar.make(view, "Please Grant Required Permissions to continue", Snackbar.LENGTH_SHORT).show();
+        String[] permissionsToRequest = Arrays.stream(AppConstants.requiredPermissions)
+                .filter(permission -> !TextBeeUtils.isPermissionGranted(mContext, permission))
+                .toArray(String[]::new);
+        Snackbar.make(view, "Grant required SMS permissions to continue", Snackbar.LENGTH_SHORT).show();
         ActivityCompat.requestPermissions(this, permissionsToRequest, PERMISSION_REQUEST_CODE);
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == SCAN_QR_REQUEST_CODE) {
-            IntentResult intentResult = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
-            if (intentResult == null || intentResult.getContents() == null) {
-                Toast.makeText(getBaseContext(), "Canceled", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            String scannedQR = intentResult.getContents();
-            apiKeyEditText.setText(scannedQR);
-            handleRegisterDevice();
+        if (requestCode != SCAN_QR_REQUEST_CODE) {
+            return;
+        }
+
+        IntentResult intentResult = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
+        if (intentResult == null || intentResult.getContents() == null) {
+            Toast.makeText(getBaseContext(), "Scan canceled", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String enrollmentToken = TextBeeUtils.normalizeEnrollmentToken(intentResult.getContents());
+        enrollmentTokenEditText.setText(enrollmentToken);
+        handleEnrollDevice();
+    }
+
+    private void refreshUiFromPreferences() {
+        isRefreshingUi = true;
+        try {
+            gatewaySwitch.setChecked(SharedPreferenceHelper.getSharedPreferenceBoolean(mContext, AppConstants.SHARED_PREFS_GATEWAY_ENABLED_KEY, false));
+            receiveSMSSwitch.setChecked(SharedPreferenceHelper.getSharedPreferenceBoolean(mContext, AppConstants.SHARED_PREFS_RECEIVE_SMS_ENABLED_KEY, false));
+            syncEnrollmentState();
+            updateSyncStatus();
+            renderAvailableSimOptions();
+        } finally {
+            isRefreshingUi = false;
         }
     }
 
+    private void updateSyncStatus() {
+        String syncError = SharedPreferenceHelper.getSharedPreferenceString(
+                mContext,
+                AppConstants.SHARED_PREFS_LAST_SYNC_ERROR_KEY,
+                ""
+        );
+        String lastSyncAt = SharedPreferenceHelper.getSharedPreferenceString(
+                mContext,
+                AppConstants.SHARED_PREFS_LAST_SYNC_AT_KEY,
+                ""
+        );
+
+        if (syncError != null && !syncError.trim().isEmpty()) {
+            syncStatusTxt.setText("Sync issue: " + syncError);
+            return;
+        }
+
+        if (lastSyncAt == null || lastSyncAt.trim().isEmpty()) {
+            syncStatusTxt.setText(isDeviceEnrolled() ? "Waiting for first sync" : "Enroll this device to begin syncing");
+            return;
+        }
+
+        try {
+            syncStatusTxt.setText("Last synced at " + android.text.format.DateFormat.format("MMM d, h:mm a", Long.parseLong(lastSyncAt)));
+        } catch (NumberFormatException ignored) {
+            syncStatusTxt.setText("Last sync timestamp is invalid");
+        }
+    }
+
+    private boolean isDeviceEnrolled() {
+        return deviceId != null && !deviceId.trim().isEmpty();
+    }
+
+    private void triggerBackgroundSync(boolean userInitiated) {
+        if (!isDeviceEnrolled()) {
+            updateSyncStatus();
+            return;
+        }
+
+        if (userInitiated) {
+            syncNowBtn.setEnabled(false);
+            syncNowBtn.setText("Syncing...");
+        }
+
+        GatewaySyncManager.syncDeviceState(mContext, new GatewaySyncManager.SyncCallback() {
+            @Override
+            public void onSuccess(EnrollDeviceResponseDTO response) {
+                applyEnrollmentResponse(response, TextBeeUtils.getPhoneNumber(mContext));
+                updateSyncStatus();
+                if (userInitiated) {
+                    Snackbar.make(syncNowBtn, "Device synced with Fellowship 360", Snackbar.LENGTH_LONG).show();
+                    syncNowBtn.setEnabled(true);
+                    syncNowBtn.setText("Sync Now");
+                }
+            }
+
+            @Override
+            public void onError(String message) {
+                updateSyncStatus();
+                if (userInitiated) {
+                    Snackbar.make(syncNowBtn, message, Snackbar.LENGTH_LONG).show();
+                    syncNowBtn.setEnabled(true);
+                    syncNowBtn.setText("Sync Now");
+                }
+            }
+        });
+    }
 }

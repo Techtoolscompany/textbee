@@ -1,10 +1,10 @@
 {
-  "name": "textbee.dev",
+  "name": "fellowship360-gateway-web",
   "version": "2.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "vercel-build": "prisma generate && next build",
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
@@ -55,6 +55,7 @@
   },
   "devDependencies": {
     "@types/node": "20.11.5",
+    "@types/nodemailer": "^7.0.11",
     "@types/react": "18.2.48",
     "@types/react-dom": "18.2.18",
     "@typescript-eslint/eslint-plugin": "^6.19.0",

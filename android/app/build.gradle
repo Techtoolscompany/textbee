@@ -12,14 +12,10 @@ android {
         targetSdk 32
         versionCode 11
         versionName "2.3.1"
+        def gatewayBaseUrl = project.findProperty("F360_GATEWAY_BASE_URL") ?: "https://fellowship360.com/"
+        buildConfigField "String", "GATEWAY_API_BASE_URL", "\"${gatewayBaseUrl}\""
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-
-//        javaCompileOptions {
-//            annotationProcessorOptions {
-//                arguments["room.schemaLocation"] = "$projectDir/schemas"
-//            }
-//        }
     }
 
     buildTypes {
@@ -35,7 +31,6 @@ android {
 }
 
 dependencies {
-
     implementation 'androidx.appcompat:appcompat:1.3.0'
     implementation 'com.google.android.material:material:1.4.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
@@ -52,9 +47,4 @@ dependencies {
     implementation 'com.squareup.retrofit2:retrofit:2.9.0'
     implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
     implementation 'com.journeyapps:zxing-android-embedded:4.1.0'
-
-//    def room_version = "2.4.2"
-//    implementation "androidx.room:room-runtime:$room_version"
-//    annotationProcessor "androidx.room:room-compiler:$room_version"
 }
-

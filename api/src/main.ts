@@ -16,8 +16,10 @@ async function bootstrap() {
   })
 
   const config = new DocumentBuilder()
-    .setTitle('TextBee API Docs')
-    .setDescription('TextBee - Android SMS Gateway API Docs')
+    .setTitle('Fellowship 360 Gateway API Docs')
+    .setDescription(
+      'Fellowship 360 Gateway API docs for the forked Android SMS gateway stack.',
+    )
     .setVersion('1.0')
     .addBearerAuth()
     .addApiKey({

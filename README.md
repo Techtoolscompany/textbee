@@ -1,91 +1,97 @@
-# TextBee - Android SMS Gateway
+# Fellowship 360 Gateway
 
-A simple SMS gateway that allows users to send SMS messages from a web interface or
-from their application via a REST API. It utilizes android phones as SMS gateways.
+Fork of TextBee, being adapted into a first-party church-facing SMS gateway for Fellowship 360.
 
-- **Technology stack**: React, Next.js, Node.js, NestJs, MongoDB, Android, Java
-- **Link**: [https://textbee.dev](https://textbee.dev/)
+## Current intent
 
-![](https://ik.imagekit.io/vernu/textbee/texbee-landing-light.png?updatedAt=1687076964687)
+This repository is no longer being treated as a generic hosted SMS product. The target shape is:
 
-## Usage
+- a branded Android gateway app that churches install once
+- a Fellowship 360-controlled web/admin surface
+- a backend that can be coupled cleanly to Fellowship 360's super-admin and org-scoped device model
 
-1. Go to [textbee.dev](https://textbee.dev) and register or login with your account
-2. Install the app on your android phone from [dl.textbee.dev](https://dl.textbee.dev)
-3. Open the app and grant the permissions for SMS
-4. Go to [textbee.dev/dashboard](https://textbee.dev/dashboard) and click register device/ generate API Key
-5. Scan the QR code with the app or enter the API key manually
-6. You are ready to send SMS messages from the dashboard or from your application via the REST API
+The fork is still early. Package IDs, signing, domain, and API compatibility have not been fully migrated yet.
 
-**Code Snippet**: Few lines of code showing how to send an SMS message via the REST API
+## Repo structure
 
-```javascript
-const API_KEY = 'YOUR_API_KEY';
-const DEVICE_ID = 'YOUR_DEVICE_ID';
+- `android/`
+  Android gateway app written in Java/Gradle
+- `api/`
+  NestJS backend using MongoDB and Firebase Admin
+- `web/`
+  Next.js dashboard/landing app using Prisma + NextAuth
 
-await axios.post(`https://api.textbee.dev/api/v1/gateway/devices/${DEVICE_ID}/send-sms`, {
-  recipients: [ '+251912345678' ],
-  message: 'Hello World!',
-}, {
-  headers: {
-    'x-api-key': API_KEY,
-  },
-});
+## Local build surface
 
-```
+### Android
 
-**Code Snippet**: Curl command to send an SMS message via the REST API
+Use Android Studio or Gradle directly:
 
 ```bash
-curl -X POST "https://api.textbee.dev/api/v1/gateway/devices/YOUR_DEVICE_ID/send-sms" \
-  -H 'x-api-key: YOUR_API_KEY' \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "recipients": [ "+251912345678" ],
-    "message": "Hello World!"
-  }'
+cd android
+./gradlew assembleDebug
 ```
 
-### Receiving SMS Messages
+What it needs:
 
-To receive SMS messages, you can enable the feature from the mobile app. You can then fetch the received SMS messages via the REST API or view them in the dashboard. (Webhook notifications are coming soon)
+- Android SDK / build tools
+- Java toolchain compatible with the Gradle project
+- Firebase config in `android/app/google-services.json`
 
-**Code Snippet**: Few lines of code showing how to fetch received SMS messages via the REST API
+Important: `applicationId` and Java package names are still on the upstream `com.vernu.sms` path and should not be changed casually. That is a deliberate migration step because it affects signing, upgrades, and Play Store identity.
 
-```javascript
-const API_KEY = 'YOUR_API_KEY';
-const DEVICE_ID = 'YOUR_DEVICE_ID';
-
-await axios.get(`https://api.textbee.dev/api/v1/gateway/devices/${DEVICE_ID}/get-received-sms`, {
-  headers: {
-    'x-api-key': API_KEY,
-  },
-});
-
-```
-
-**Code Snippet**: Curl command to fetch received SMS messages
+### API
 
 ```bash
-curl -X GET "https://api.textbee.dev/api/v1/gateway/devices/YOUR_DEVICE_ID/get-received-sms"\
-  -H "x-api-key: YOUR_API_KEY"
+cd api
+pnpm install
+pnpm start:dev
+pnpm build
+pnpm test
 ```
 
-## Contributing
+Primary env requirements inferred from source:
 
-Contributions are welcome!
+- `MONGO_URI`
+- `JWT_SECRET`
+- `JWT_EXPIRATION`
+- `FRONTEND_URL`
+- `MAIL_HOST`
+- `MAIL_PORT`
+- `MAIL_USER`
+- `MAIL_PASS`
+- `MAIL_FROM`
+- `MAIL_REPLY_TO`
+- Firebase service-account vars used in `src/main.ts`
 
-1. [Fork](https://github.com/vernu/textbee/fork) the project.
-2. Create a feature or bugfix branch from `main` branch.
-3. Make sure your commit messages and PR comment summaries are descriptive.
-4. Create a pull request to the `main` branch.
+### Web
 
-## Bug Reporting and Feature Requests
+```bash
+cd web
+pnpm install
+pnpm dev
+pnpm build
+```
 
-Please feel free to [create an issue](https://github.com/vernu/textbee/issues/new) in the repository for any bug reports or feature requests. Make sure to provide a detailed description of the issue or feature you are requesting and properly label whether it is a bug or a feature request.
+Primary env requirements inferred from source:
 
-Please note that if you discover any vulnerability or security issue, we kindly request that you refrain from creating a public issue. Instead, send an email detailing the vulnerability to textbee.dev@gmail.com.
+- `NEXTAUTH_SECRET`
+- `NEXT_PUBLIC_API_BASE_URL`
+- `NEXT_PUBLIC_GOOGLE_CLIENT_ID`
+- Prisma database env required by the Prisma schema/runtime
+- mail/admin notification vars used by route handlers
 
+## Immediate migration priorities
 
-## For support, feedback, and questions
-Feel free to reach out to us at textbee.dev@gmail.com or [Join our Discord server](https://discord.gg/d7vyfBpWbQ)
+1. Lock the permanent Fellowship 360 gateway identity:
+   - package name
+   - app name
+   - signing key
+   - deployment domain(s)
+2. Decide whether the forked backend stays standalone or becomes a compatibility layer in front of Fellowship 360's internal SMS gateway routes.
+3. Remove direct TextBee branding and hosted URLs from Android, API, and web.
+4. Align device registration, assignment, inbound SMS, and delivery-state flows with Fellowship 360's org model.
+
+## Current constraint
+
+This fork should be treated as a sibling product workspace inside the Fellowship 360 repo while it is being audited and reworked. Avoid assuming the upstream TextBee hosted service or domains remain authoritative.
